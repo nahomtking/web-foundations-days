@@ -63,25 +63,19 @@ console.log(countByCategory());
 
 notes = savedNotesForCount;
 function getSummary() {
-    return {
-        total: notes.length,
-        byCategory: countByCategory(),
-        longest: longestNote()
-    };
+    let counts = countByCategory();
+    let noteLabel = notes.length === 1 ? "note" : "notes";
+
+    return `${notes.length} ${noteLabel}: ${counts.personal || 0} personal, ${counts.work || 0} work, ${counts.study || 0} study`;
 }
 console.log(getSummary());
-// Expected:
-// {
-//     total: 5,
-//     byCategory: { personal: 2, study: 2, work: 1 },
-//     longest: { id: 3, text: "Email the project report to Grace", category: "work" }
-// }
+// Expected: "5 notes: 2 personal, 1 work, 2 study"
 
 let savedNotesForSummary = notes;
 notes = [];
 
 console.log(getSummary());
-// Expected: { total: 0, byCategory: {}, longest: null }
+// Expected: "0 notes: 0 personal, 0 work, 0 study"
 
 notes = savedNotesForSummary;
 function isDuplicate(text) {
@@ -98,8 +92,26 @@ console.log(isDuplicate("BUY MILK AND BREAD"));
 console.log(isDuplicate("Buy eggs"));
 // Expected: false
 function addNote(text, category) {
-    if (!text.trim() || isDuplicate(text)) {
-        return null;
+    if (!text.trim()) {
+        console.log("Note cannot be empty.");
+        return false;
+    }
+
+    if (text.trim().length > 200) {
+        console.log("Note cannot be longer than 200 characters.");
+        return false;
+    }
+
+    if (isDuplicate(text)) {
+        console.log("A note with this text already exists.");
+        return false;
+    }
+
+    let validCategories = ["personal", "work", "study"];
+
+    if (!validCategories.includes(category)) {
+        console.log("Invalid category.");
+        return false;
     }
 
     let nextId = notes.length > 0
@@ -114,16 +126,20 @@ function addNote(text, category) {
 
     notes.push(newNote);
 
-    return newNote;
+    console.log("Note added successfully.");
+    return true;
 }
 console.log(addNote("Plan weekend trip", "personal"));
-// Expected: { id: 6, text: "Plan weekend trip", category: "personal" }
+// Expected: true
 
 console.log(addNote("BUY MILK AND BREAD", "personal"));
-// Expected: null
+// Expected: false
 
 console.log(addNote("   ", "personal"));
-// Expected: null
+// Expected: false
 
-console.log(notes);
-// Expected: original 5 notes plus "Plan weekend trip"
+console.log(addNote("Go shopping", "random"));
+// Expected: false
+
+console.log(addNote("a".repeat(201), "personal"));
+// Expected: false
