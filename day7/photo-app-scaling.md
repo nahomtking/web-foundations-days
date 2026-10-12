@@ -165,32 +165,33 @@ Instead, the original photos and thumbnails should be stored in object storage. 
 
 ## 7. Photo Upload Flow
 
-1. The user selects a photo and starts an upload.
-2. The request reaches the load balancer, which sends it to an available application server.
-3. The application server validates the user and the upload.
-4. The original photo is stored in object storage.
-5. The application stores the photo metadata and object-storage location in the primary database.
-6. The application places a thumbnail-generation job on the queue.
-7. The application can respond to the user that the upload has been accepted without waiting for the thumbnail to finish.
-8. A thumbnail worker takes the job from the queue.
-9. The worker downloads or accesses the original photo from object storage and creates the 50 KB thumbnail.
-10. The worker stores the thumbnail in object storage.
-11. The thumbnail can then be delivered through the CDN when users view the photo.
+1. The user selects a photo in the SnapShare app and starts the upload.
+2. The upload request is received by the load balancer and forwarded to an available app server.
+3. The app server authenticates the user and validates the uploaded photo.
+4. The original photo is uploaded to object storage instead of being stored in the database.
+5. The app server creates a photo record in the primary database containing information such as the user, photo ID, and object-storage location.
+6. The app server places a thumbnail-generation job containing the photo information onto the queue.
+7. The app server responds to the user that the photo has been uploaded successfully without waiting for thumbnail creation to finish.
+8. A thumbnail worker takes the job from the queue and creates a smaller thumbnail from the original photo.
+9. The worker stores the thumbnail in object storage.
+10. The thumbnail becomes available through the CDN for users viewing the photo.
 
-## 8. Trade-Offs
+Because thumbnail generation is asynchronous, the user does not have to wait for image processing before the upload request finishes. The original photo can be available first, while the thumbnail may appear a short time later after the worker completes its job.
 
-### CDN and caching vs freshness
+## 8. Architectural Trade-Offs
 
-Using a CDN and cache greatly improves performance and reduces load on the application servers, but cached content may not immediately reflect a newly uploaded or changed photo. The system therefore needs cache expiration or cache invalidation rules.
+### Read Replicas vs. Immediate Consistency
 
-### Read replica vs consistency
+Using a database read replica increases the system's ability to handle the large number of feed reads, but replicas can have a small delay before they receive the latest changes from the primary database. This means a newly created photo or updated information might not immediately appear in every read request. The system can read from the primary database when the newest data is required.
 
-A read replica increases the system's ability to handle large numbers of read requests, but there can be a short delay before changes made to the primary database appear on the replica. Some operations may therefore need to read directly from the primary database when the newest data is required.
+### Asynchronous Thumbnail Generation vs. Immediate Thumbnail Availability
 
-### Asynchronous thumbnails vs immediate availability
+Using a queue and worker keeps the upload request fast because the application does not need to wait for thumbnail processing. The trade-off is that the thumbnail is not guaranteed to be available immediately after the original photo is uploaded. The user may briefly see the original image or a placeholder until the thumbnail worker finishes.
 
-Using a queue and worker makes uploads faster because thumbnail creation happens in the background. However, the thumbnail may not be available immediately after the original photo is uploaded.
+### CDN and Cache vs. Freshness
 
-### Object storage vs database storage
+Using a CDN and cache reduces repeated requests reaching the application servers and database and makes the feed faster. The trade-off is that cached photos or feed information may become temporarily outdated. Cache expiration and invalidation are therefore needed when content changes.
 
-Object storage is better suited to very large amounts of photo data and can scale independently from the database, but it adds another system that the application must manage and monitor.
+### Dynamic Feed Assembly vs. Pre-Generated Feeds
+
+Dynamically assembling a feed keeps the feed data more current and avoids storing a separate copy of every user's feed, but it requires more database and application work for each feed request. Pre-generating feeds can make reads faster, but it requires additional storage and processing and can make changes harder to propagate immediately.
